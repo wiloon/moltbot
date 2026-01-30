@@ -145,29 +145,95 @@ Webex requires a public HTTPS endpoint to receive messages. Configure:
 
 Polling mode fetches messages from Webex API at regular intervals. No public URL required!
 
+**Minimal config (polling only):**
 ```json5
 {
   channels: {
     webex: {
       enabled: true,
-      mode: "polling",  // no public URL needed
+      mode: "polling",
       botToken: "YOUR_TOKEN",
       polling: {
-        intervalSeconds: 5  // check every 5 seconds (default)
+        intervalSeconds: 5  // default, can be omitted
       }
     }
   }
 }
 ```
 
+**Note:** When using `mode: "polling"`, you can completely omit the `webhook` section.
+
 ### Polling Considerations
 - **Latency**: ~5 second delay (configurable)
 - **Rate Limits**: Webex API has rate limits (120 req/min)
 - **Best For**: Corporate networks, firewalls, testing
 - **Recommended Interval**: 5-10 seconds
+- **Config Cleanup**: No `webhook` section needed!
 
-## Full configuration example
+## Configuration examples by mode
 
+### Polling mode (recommended for internal networks)
+```json5
+{
+  channels: {
+    webex: {
+      enabled: true,
+      mode: "polling",
+      botToken: "YOUR_BOT_ACCESS_TOKEN",
+      dmPolicy: "allowlist",
+      allowFrom: ["user@example.com"],
+      polling: {
+        intervalSeconds: 5  // optional, defaults to 5
+      }
+    }
+  }
+}
+```
+
+### Webhook mode (requires public URL)
+```json5
+{
+  channels: {
+    webex: {
+      enabled: true,
+      mode: "webhook",
+      botToken: "YOUR_BOT_ACCESS_TOKEN",
+      dmPolicy: "allowlist",
+      allowFrom: ["user@example.com"],
+      webhook: {
+        port: 3979,
+        path: "/webex/webhook",
+        url: "https://your-domain.com/webex/webhook"
+      }
+    }
+  }
+}
+```
+
+### Both modes (maximum reliability)
+```json5
+{
+  channels: {
+    webex: {
+      enabled: true,
+      mode: "both",
+      botToken: "YOUR_BOT_ACCESS_TOKEN",
+      dmPolicy: "allowlist",
+      allowFrom: ["user@example.com"],
+      webhook: {
+        port: 3979,
+        path: "/webex/webhook",
+        url: "https://your-domain.com/webex/webhook"
+      },
+      polling: {
+        intervalSeconds: 10  // slower when webhook is primary
+      }
+    }
+  }
+}
+```
+
+### Full configuration (all options)
 ```json5
 {
   channels: {
@@ -189,14 +255,14 @@ Polling mode fetches messages from Webex API at regular intervals. No public URL
         "admin@example.com"
       ],
       
-      // Webhook configuration (only if mode includes "webhook")
+      // Webhook (omit if mode = "polling")
       webhook: {
         port: 3979,
         path: "/webex/webhook",
         url: "https://your-domain.com/webex/webhook"
       },
       
-      // Polling configuration (only if mode includes "polling")
+      // Polling (omit if mode = "webhook")
       polling: {
         intervalSeconds: 5
       }

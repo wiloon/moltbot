@@ -19,11 +19,26 @@ moltbot plugins install ./extensions/webex
 2. Get the Bot Access Token
 3. Configure Moltbot:
 
+**Polling mode (no public URL needed):**
 ```json5
 {
   channels: {
     webex: {
       enabled: true,
+      mode: "polling",
+      botToken: "YOUR_BOT_ACCESS_TOKEN"
+    }
+  }
+}
+```
+
+**Webhook mode (requires public URL):**
+```json5
+{
+  channels: {
+    webex: {
+      enabled: true,
+      mode: "webhook",
       botToken: "YOUR_BOT_ACCESS_TOKEN",
       webhook: {
         url: "https://your-domain.com/webex/webhook"
@@ -46,7 +61,8 @@ export WEBEX_BOT_TOKEN="YOUR_TOKEN"
 - ✅ Markdown formatting
 - ✅ @mentions
 - ✅ DM pairing and allowlists
-- ✅ Webhook-based message receiving
+- ✅ **Polling mode** (no public URL needed) or **Webhook mode** (real-time)
+- ✅ Corporate firewall friendly
 
 ## Documentation
 
