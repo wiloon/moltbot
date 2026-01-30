@@ -1,0 +1,37 @@
+{
+  "name": "@moltbot/webex",
+  "version": "2026.1.29",
+  "type": "module",
+  "description": "Moltbot Webex channel plugin",
+  "keywords": ["moltbot", "webex", "cisco-webex", "bot"],
+  "license": "MIT",
+  "main": "./index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "moltbot": {
+    "extensions": ["./index.ts"],
+    "channel": {
+      "id": "webex",
+      "label": "Webex",
+      "selectionLabel": "Cisco Webex Teams",
+      "docsPath": "/channels/webex",
+      "docsLabel": "webex",
+      "blurb": "Enterprise messaging; bot integration.",
+      "aliases": ["webex-teams", "cisco-webex"],
+      "order": 70
+    },
+    "install": {
+      "npmSpec": "@moltbot/webex",
+      "localPath": "extensions/webex",
+      "defaultChoice": "npm"
+    }
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "moltbot": "workspace:*"
+  }
+}
