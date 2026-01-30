@@ -214,6 +214,7 @@ export async function monitorWebexProvider(
       try {
         // First, get all rooms the bot is in
         const rooms = await client.listRooms({ sortBy: "lastactivity", max: 50 });
+        log.debug(`polling: fetched ${rooms.items.length} rooms`);
         
         for (const room of rooms.items) {
           try {
@@ -228,25 +229,40 @@ export async function monitorWebexProvider(
 
             // Process messages in reverse chronological order (oldest first)
             const items = messages.items || [];
+            log.debug(`polling room ${room.id}: fetched ${items.length} messages, lastTime=${new Date(lastTime).toISOString()}`);
+            
             for (const message of [...items].reverse()) {
               const messageTime = new Date(message.created).getTime();
               
               // Skip messages we've already processed
               if (messageTime <= lastTime) {
+                log.debug(`skipping old message: ${messageTime} <= ${lastTime}`);
                 continue;
               }
 
               // Skip bot's own messages
               if (message.personEmail === botEmail) {
+                log.debug(`skipping bot's own message: ${message.id}`);
                 lastMessageTimeByRoom.set(room.id, Math.max(lastTime, messageTime));
                 continue;
               }
 
+              log.info(`processing message ${message.id} from ${message.personEmail}: "${message.text}"`);
+
               // Parse the message (similar to webhook handler)
+              // Include all necessary fields from the message for proper parsing
               const event = {
                 resource: "messages",
                 event: "created",
-                data: { id: message.id },
+                data: { 
+                  id: message.id,
+                  roomId: message.roomId,
+                  roomType: message.roomType,
+                  personId: message.personId,
+                  personEmail: message.personEmail,
+                  created: message.created,
+                  mentionedPeople: message.mentionedPeople,
+                },
               };
               
               const parsed = parseWebexWebhookEvent(event, message, botId);
@@ -256,6 +272,7 @@ export async function monitorWebexProvider(
                 webexCfg.groupPolicy === "allowlist";
               
               if (!shouldProcessWebexMessage(parsed, requireMentionInGroups)) {
+                log.debug(`skipping message: no mention in group`);
                 lastMessageTimeByRoom.set(room.id, Math.max(lastTime, messageTime));
                 continue;
               }
@@ -292,10 +309,17 @@ export async function monitorWebexProvider(
             }
           } catch (roomError: any) {
             log.warn(`error polling room ${room.id}: ${roomError?.message || String(roomError)}`);
+            if (roomError?.stack) {
+              log.debug(`room error stack: ${roomError.stack}`);
+            }
           }
         }
       } catch (error: any) {
         log.error(`polling error: ${error?.message || String(error)}`);
+        log.error(`error details: ${JSON.stringify(error, null, 2)}`);
+        if (error?.stack) {
+          log.error(`error stack: ${error.stack}`);
+        }
       }
     };
 
