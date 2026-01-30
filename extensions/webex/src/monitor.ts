@@ -1,4 +1,4 @@
-import type { MoltbotConfig, PluginRuntime } from "clawdbot/plugin-sdk";
+import type { MoltbotConfig } from "clawdbot/plugin-sdk";
 import { DEFAULT_ACCOUNT_ID } from "clawdbot/plugin-sdk";
 import express, { type Request, type Response } from "express";
 import { WebexClient } from "./api.js";
@@ -14,7 +14,6 @@ import { probeWebex } from "./probe.js";
 
 export type MonitorWebexOpts = {
   cfg: MoltbotConfig;
-  runtime?: PluginRuntime;
   abortSignal?: AbortSignal;
 };
 
@@ -48,9 +47,6 @@ export async function monitorWebexProvider(
 
   // Determine mode: webhook, polling, or both
   const mode = webexCfg.mode || "webhook";
-
-  // Use runtime from opts
-  const runtime: PluginRuntime = opts.runtime!;
 
   // Probe to get bot info
   const probe = await probeWebex(webexCfg);
@@ -128,7 +124,7 @@ export async function monitorWebexProvider(
       }
 
       // Route message to agent using runtime dispatch
-      const route = runtime.channel.routing.resolveAgentRoute({
+      const route = core.channel.routing.resolveAgentRoute({
         cfg,
         channel: "webex",
         accountId: DEFAULT_ACCOUNT_ID,
@@ -138,18 +134,18 @@ export async function monitorWebexProvider(
         },
       });
 
-      const storePath = runtime.channel.session.resolveStorePath(cfg.session?.store, {
+      const storePath = core.channel.session.resolveStorePath(cfg.session?.store, {
         agentId: route.agentId,
       });
 
-      const envelopeOptions = runtime.channel.reply.resolveEnvelopeFormatOptions(cfg);
-      const previousTimestamp = runtime.channel.session.readSessionUpdatedAt({
+      const envelopeOptions = core.channel.reply.resolveEnvelopeFormatOptions(cfg);
+      const previousTimestamp = core.channel.session.readSessionUpdatedAt({
         storePath,
         sessionKey: route.sessionKey,
       });
 
       const fromLabel = parsed.personEmail || parsed.personId;
-      const body = runtime.channel.reply.formatAgentEnvelope({
+      const body = core.channel.reply.formatAgentEnvelope({
         channel: "Webex",
         from: fromLabel,
         timestamp: parsed.created,
@@ -158,7 +154,7 @@ export async function monitorWebexProvider(
         body: text,
       });
 
-      const ctxPayload = runtime.channel.reply.finalizeInboundContext({
+      const ctxPayload = core.channel.reply.finalizeInboundContext({
         Body: body,
         RawBody: text,
         CommandBody: text,
@@ -181,7 +177,7 @@ export async function monitorWebexProvider(
       });
 
       // Record session metadata
-      await runtime.channel.session
+      await core.channel.session
         .recordSessionMetaFromInbound({
           storePath,
           sessionKey: ctxPayload.SessionKey ?? route.sessionKey,
@@ -192,7 +188,7 @@ export async function monitorWebexProvider(
         });
 
       // Dispatch to agent
-      await runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+      await core.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
         ctx: ctxPayload,
         cfg,
         dispatcherOptions: {
@@ -350,7 +346,7 @@ export async function monitorWebexProvider(
               log.info(`received message from ${parsed.personEmail}: ${text.substring(0, 50)}...`);
 
               // Route message to agent using runtime dispatch
-              const route = runtime.channel.routing.resolveAgentRoute({
+              const route = core.channel.routing.resolveAgentRoute({
                 cfg,
                 channel: "webex",
                 accountId: DEFAULT_ACCOUNT_ID,
@@ -360,18 +356,18 @@ export async function monitorWebexProvider(
                 },
               });
 
-              const storePath = runtime.channel.session.resolveStorePath(cfg.session?.store, {
+              const storePath = core.channel.session.resolveStorePath(cfg.session?.store, {
                 agentId: route.agentId,
               });
 
-              const envelopeOptions = runtime.channel.reply.resolveEnvelopeFormatOptions(cfg);
-              const previousTimestamp = runtime.channel.session.readSessionUpdatedAt({
+              const envelopeOptions = core.channel.reply.resolveEnvelopeFormatOptions(cfg);
+              const previousTimestamp = core.channel.session.readSessionUpdatedAt({
                 storePath,
                 sessionKey: route.sessionKey,
               });
 
               const fromLabel = parsed.personEmail || parsed.personId;
-              const body = runtime.channel.reply.formatAgentEnvelope({
+              const body = core.channel.reply.formatAgentEnvelope({
                 channel: "Webex",
                 from: fromLabel,
                 timestamp: parsed.created,
@@ -380,7 +376,7 @@ export async function monitorWebexProvider(
                 body: text,
               });
 
-              const ctxPayload = runtime.channel.reply.finalizeInboundContext({
+              const ctxPayload = core.channel.reply.finalizeInboundContext({
                 Body: body,
                 RawBody: text,
                 CommandBody: text,
@@ -403,7 +399,7 @@ export async function monitorWebexProvider(
               });
 
               // Record session metadata
-              await runtime.channel.session
+              await core.channel.session
                 .recordSessionMetaFromInbound({
                   storePath,
                   sessionKey: ctxPayload.SessionKey ?? route.sessionKey,
@@ -414,7 +410,7 @@ export async function monitorWebexProvider(
                 });
 
               // Dispatch to agent
-              await runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+              await core.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
                 ctx: ctxPayload,
                 cfg,
                 dispatcherOptions: {

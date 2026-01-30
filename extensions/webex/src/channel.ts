@@ -279,7 +279,6 @@ export const webexPlugin: ChannelPlugin<ResolvedWebexAccount> = {
       ctx.log?.info("starting webex provider");
       return monitorWebexProvider({
         cfg: ctx.cfg,
-        runtime: ctx.runtime,
         abortSignal: ctx.abortSignal,
       });
     },

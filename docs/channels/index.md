@@ -16,7 +16,6 @@ Text is supported everywhere; media and reactions vary by channel.
 - [Discord](/channels/discord) — Discord Bot API + Gateway; supports servers, channels, and DMs.
 - [Slack](/channels/slack) — Bolt SDK; workspace apps.
 - [Google Chat](/channels/googlechat) — Google Chat API app via HTTP webhook.
-- [Webex](/channels/webex) — Cisco Webex Teams enterprise bot integration (plugin, installed separately).
 - [Mattermost](/channels/mattermost) — Bot API + WebSocket; channels, groups, DMs (plugin, installed separately).
 - [Signal](/channels/signal) — signal-cli; privacy-focused.
 - [BlueBubbles](/channels/bluebubbles) — **Recommended for iMessage**; uses the BlueBubbles macOS server REST API with full feature support (edit, unsend, effects, reactions, group management — edit currently broken on macOS 26 Tahoe).
@@ -31,6 +30,7 @@ Text is supported everywhere; media and reactions vary by channel.
 - [Zalo](/channels/zalo) — Zalo Bot API; Vietnam's popular messenger (plugin, installed separately).
 - [Zalo Personal](/channels/zalouser) — Zalo personal account via QR login (plugin, installed separately).
 - [WebChat](/web/webchat) — Gateway WebChat UI over WebSocket.
+- [Webex](/channels/webex) — Cisco Webex Teams enterprise bot integration (plugin, installed separately).
 
 ## Notes
 
