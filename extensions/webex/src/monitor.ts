@@ -31,7 +31,7 @@ export async function monitorWebexProvider(
 ): Promise<MonitorWebexResult> {
   const core = getWebexRuntime();
   const log = core.logging.getChildLogger({ name: "webex" });
-  const { cfg, runtime, abortSignal } = opts;
+  const { cfg, abortSignal } = opts;
 
   const webexCfg = cfg.channels?.webex;
   if (!webexCfg?.enabled) {
