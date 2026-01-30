@@ -1,6 +1,6 @@
 import type { MoltbotConfig, RuntimeEnv } from "clawdbot/plugin-sdk";
 import express, { type Request, type Response } from "express";
-import Webex from "webex";
+import { WebexClient } from "./api.js";
 import { resolveWebexCredentials } from "./token.js";
 import { getWebexRuntime } from "./runtime.js";
 import {
@@ -70,15 +70,11 @@ export async function monitorWebexProvider(
 
   log.info(`webex bot authenticated: ${botName} (${botEmail})`);
 
-  // Initialize Webex SDK
-  const webex = Webex.init({
-    credentials: {
-      access_token: credentials.botToken,
-    },
-  });
+  // Use REST API client (works in Node.js - no browser dependencies)
+  const client = new WebexClient(credentials.botToken);
 
   // State for polling mode
-  let lastMessageTime = Date.now();
+  const pollStartTime = Date.now();
   let pollingInterval: NodeJS.Timeout | null = null;
   const pollingIntervalMs = (webexCfg.polling?.intervalSeconds ?? 5) * 1000;
 
@@ -115,7 +111,7 @@ export async function monitorWebexProvider(
 
       // Get full message details
       const messageId = event.data.id;
-      const fullMessage = await webex.messages.get(messageId);
+      const fullMessage = await client.getMessage(messageId);
 
       // Parse the message
       const parsed = parseWebexWebhookEvent(event, fullMessage, botId);
@@ -174,9 +170,9 @@ export async function monitorWebexProvider(
     // Register webhook with Webex
     try {
       // Check if webhook already exists
-      const existingWebhooks = await webex.webhooks.list();
+      const existingWebhooks = await client.listWebhooks();
       const existing = existingWebhooks.items.find(
-        (wh: any) => wh.targetUrl === webhookUrl && wh.resource === "messages",
+        (wh) => wh.targetUrl === webhookUrl && wh.resource === "messages",
       );
 
       if (existing) {
@@ -184,7 +180,7 @@ export async function monitorWebexProvider(
         log.info(`using existing webhook: ${webhookId}`);
       } else {
         // Create new webhook
-        const webhook = await webex.webhooks.create({
+        const webhook = await client.createWebhook({
           name: "Moltbot Webex Webhook",
           targetUrl: webhookUrl,
           resource: "messages",
@@ -211,73 +207,92 @@ export async function monitorWebexProvider(
   if (enablePolling) {
     log.info(`starting polling mode (interval: ${pollingIntervalMs / 1000}s)`);
     
+    // Track last message time per room
+    const lastMessageTimeByRoom = new Map<string, number>();
+    
     const pollMessages = async () => {
       try {
-        // List recent messages
-        const messages = await webex.messages.list({
-          max: 50, // Get up to 50 recent messages
-        });
+        // First, get all rooms the bot is in
+        const rooms = await client.listRooms({ sortBy: "lastactivity", max: 50 });
+        
+        for (const room of rooms.items) {
+          try {
+            // Get last known time for this room (or use poll start time)
+            const lastTime = lastMessageTimeByRoom.get(room.id) || pollStartTime;
+            
+            // List recent messages in this room
+            const messages = await client.listMessages({
+              roomId: room.id,
+              max: 20,
+            });
 
-        // Process messages in reverse chronological order
-        const items = messages.items || [];
-        for (const message of items.reverse()) {
-          const messageTime = new Date(message.created).getTime();
-          
-          // Skip messages we've already processed
-          if (messageTime <= lastMessageTime) {
-            continue;
+            // Process messages in reverse chronological order (oldest first)
+            const items = messages.items || [];
+            for (const message of [...items].reverse()) {
+              const messageTime = new Date(message.created).getTime();
+              
+              // Skip messages we've already processed
+              if (messageTime <= lastTime) {
+                continue;
+              }
+
+              // Skip bot's own messages
+              if (message.personEmail === botEmail) {
+                lastMessageTimeByRoom.set(room.id, Math.max(lastTime, messageTime));
+                continue;
+              }
+
+              // Parse the message (similar to webhook handler)
+              const event = {
+                resource: "messages",
+                event: "created",
+                data: { id: message.id },
+              };
+              
+              const parsed = parseWebexWebhookEvent(event, message, botId);
+
+              // Check if we should process this message
+              const requireMentionInGroups = webexCfg.groupPolicy === "mention" || 
+                webexCfg.groupPolicy === "allowlist";
+              
+              if (!shouldProcessWebexMessage(parsed, requireMentionInGroups)) {
+                lastMessageTimeByRoom.set(room.id, Math.max(lastTime, messageTime));
+                continue;
+              }
+
+              // Clean up the text (remove bot mention if present)
+              let text = parsed.text || parsed.markdown || "";
+              if (parsed.isBotMentioned) {
+                text = stripWebexBotMention(text, botName);
+              }
+
+              log.info(`received message from ${parsed.personEmail}: ${text.substring(0, 50)}...`);
+
+              // Route message to agent
+              const messageContext = {
+                channel: "webex",
+                from: parsed.personEmail || parsed.personId,
+                to: parsed.roomId || parsed.personId,
+                text,
+                messageId: parsed.messageId,
+                timestamp: parsed.created,
+                isDirectMessage: parsed.roomType === "direct",
+                files: parsed.files,
+              };
+
+              // Emit message event to runtime
+              await core.channel.events.onMessage({
+                cfg,
+                context: messageContext,
+                runtime,
+              });
+
+              // Update last message time for this room
+              lastMessageTimeByRoom.set(room.id, Math.max(lastTime, messageTime));
+            }
+          } catch (roomError: any) {
+            log.warn(`error polling room ${room.id}: ${roomError?.message || String(roomError)}`);
           }
-
-          // Skip bot's own messages
-          if (message.personEmail === botEmail) {
-            continue;
-          }
-
-          // Parse the message (similar to webhook handler)
-          const event = {
-            resource: "messages",
-            event: "created",
-            data: { id: message.id },
-          };
-          
-          const parsed = parseWebexWebhookEvent(event, message, botId);
-
-          // Check if we should process this message
-          const requireMentionInGroups = webexCfg.groupPolicy === "mention" || 
-            webexCfg.groupPolicy === "allowlist";
-          
-          if (!shouldProcessWebexMessage(parsed, requireMentionInGroups)) {
-            lastMessageTime = Math.max(lastMessageTime, messageTime);
-            continue;
-          }
-
-          // Clean up the text (remove bot mention if present)
-          let text = parsed.text || parsed.markdown || "";
-          if (parsed.isBotMentioned) {
-            text = stripWebexBotMention(text, botName);
-          }
-
-          // Route message to agent
-          const messageContext = {
-            channel: "webex",
-            from: parsed.personEmail || parsed.personId,
-            to: parsed.roomId || parsed.personId,
-            text,
-            messageId: parsed.messageId,
-            timestamp: parsed.created,
-            isDirectMessage: parsed.roomType === "direct",
-            files: parsed.files,
-          };
-
-          // Emit message event to runtime
-          await core.channel.events.onMessage({
-            cfg,
-            context: messageContext,
-            runtime,
-          });
-
-          // Update last message time
-          lastMessageTime = Math.max(lastMessageTime, messageTime);
         }
       } catch (error: any) {
         log.error(`polling error: ${error?.message || String(error)}`);
@@ -316,7 +331,7 @@ export async function monitorWebexProvider(
     // Delete webhook if we created it
     if (webhookId) {
       try {
-        await webex.webhooks.remove(webhookId);
+        await client.deleteWebhook(webhookId);
         log.info(`deleted webhook: ${webhookId}`);
       } catch (error: any) {
         log.warn(`failed to delete webhook: ${error?.message || String(error)}`);

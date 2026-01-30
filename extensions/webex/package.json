@@ -28,9 +28,10 @@
     }
   },
   "dependencies": {
-    "webex": "^3.2.0"
+    "express": "^4.21.0"
   },
   "devDependencies": {
+    "@types/express": "^4.17.21",
     "moltbot": "workspace:*"
   }
 }

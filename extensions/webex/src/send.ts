@@ -1,5 +1,5 @@
 import type { MoltbotConfig } from "clawdbot/plugin-sdk";
-import Webex from "webex";
+import { WebexClient } from "./api.js";
 import { resolveWebexCredentials } from "./token.js";
 
 export type SendWebexMessageParams = {
@@ -21,6 +21,7 @@ export type SendWebexMessageResult = {
 
 /**
  * Send a message to a Webex room or person.
+ * Uses pure REST API - no SDK dependencies.
  * Supports plain text, Markdown, and file attachments.
  */
 export async function sendMessageWebex(
@@ -34,13 +35,16 @@ export async function sendMessageWebex(
       return { ok: false, error: "No Webex credentials configured" };
     }
 
-    const webex = Webex.init({
-      credentials: {
-        access_token: credentials.botToken,
-      },
-    });
+    // Use REST API client (works in Node.js - no browser dependencies)
+    const client = new WebexClient(credentials.botToken);
 
-    const messagePayload: any = {
+    const messagePayload: {
+      roomId?: string;
+      toPersonId?: string;
+      toPersonEmail?: string;
+      markdown: string;
+      files?: string[];
+    } = {
       markdown: text,
     };
 
@@ -63,7 +67,7 @@ export async function sendMessageWebex(
       messagePayload.files = [mediaUrl];
     }
 
-    const response = await webex.messages.create(messagePayload);
+    const response = await client.createMessage(messagePayload);
 
     return {
       ok: true,
@@ -90,13 +94,8 @@ export async function getWebexMessage(
     throw new Error("No Webex credentials configured");
   }
 
-  const webex = Webex.init({
-    credentials: {
-      access_token: credentials.botToken,
-    },
-  });
-
-  return await webex.messages.get(messageId);
+  const client = new WebexClient(credentials.botToken);
+  return client.getMessage(messageId);
 }
 
 /**
@@ -108,12 +107,7 @@ export async function listWebexRooms(cfg: MoltbotConfig): Promise<any[]> {
     return [];
   }
 
-  const webex = Webex.init({
-    credentials: {
-      access_token: credentials.botToken,
-    },
-  });
-
-  const response = await webex.rooms.list();
+  const client = new WebexClient(credentials.botToken);
+  const response = await client.listRooms();
   return response.items || [];
 }

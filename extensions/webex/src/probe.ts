@@ -1,5 +1,5 @@
 import type { MoltbotConfig } from "clawdbot/plugin-sdk";
-import Webex from "webex";
+import { WebexClient } from "./api.js";
 import { resolveWebexCredentials } from "./token.js";
 
 export type WebexProbeResult = {
@@ -15,6 +15,7 @@ export type WebexProbeResult = {
 
 /**
  * Probe Webex API to verify connectivity and credentials
+ * Uses pure REST API - no SDK dependencies
  */
 export async function probeWebex(
   webexConfig: any,
@@ -32,14 +33,11 @@ export async function probeWebex(
       };
     }
 
-    const webex = Webex.init({
-      credentials: {
-        access_token: token,
-      },
-    });
+    // Use REST API client (works in Node.js - no browser dependencies)
+    const client = new WebexClient(token);
 
     // Get bot's own information to verify token
-    const person = await webex.people.get("me");
+    const person = await client.getMe();
 
     return {
       ok: true,
@@ -73,15 +71,11 @@ export async function verifyWebexWebhook(
       return { ok: false, error: "No credentials configured" };
     }
 
-    const webex = Webex.init({
-      credentials: {
-        access_token: credentials.botToken,
-      },
-    });
+    const client = new WebexClient(credentials.botToken);
 
     // List existing webhooks
-    const webhooks = await webex.webhooks.list();
-    const existing = webhooks.items.find((wh: any) => wh.targetUrl === webhookUrl);
+    const webhooks = await client.listWebhooks();
+    const existing = webhooks.items.find((wh) => wh.targetUrl === webhookUrl);
 
     if (existing) {
       return { ok: true };
