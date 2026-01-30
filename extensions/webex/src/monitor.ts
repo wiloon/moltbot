@@ -1,4 +1,4 @@
-import type { MoltbotConfig, RuntimeEnv } from "clawdbot/plugin-sdk";
+import type { MoltbotConfig, PluginRuntime } from "clawdbot/plugin-sdk";
 import express, { type Request, type Response } from "express";
 import { WebexClient } from "./api.js";
 import { resolveWebexCredentials } from "./token.js";
@@ -13,7 +13,7 @@ import { probeWebex } from "./probe.js";
 
 export type MonitorWebexOpts = {
   cfg: MoltbotConfig;
-  runtime?: RuntimeEnv;
+  runtime?: PluginRuntime;
   abortSignal?: AbortSignal;
 };
 
@@ -49,7 +49,7 @@ export async function monitorWebexProvider(
   const mode = webexCfg.mode || "webhook";
 
   // Use runtime from opts (contains channel.events.onMessage)
-  const runtime: RuntimeEnv = opts.runtime!;
+  const runtime: PluginRuntime = opts.runtime!;
 
   // Probe to get bot info
   const probe = await probeWebex(webexCfg);
