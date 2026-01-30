@@ -235,8 +235,8 @@ export async function startGatewayServer(
   // Create plugin runtime instance (shared across all channels)
   const pluginRuntime = createPluginRuntime();
   const channelRuntimeEnvs = Object.fromEntries(
-    listChannelPlugins().map((plugin) => [plugin.id, pluginRuntime]),
-  ) as Record<ChannelId, PluginRuntime>;
+    listChannelPlugins().map((plugin) => [plugin.id, pluginRuntime as unknown as RuntimeEnv]),
+  ) as Record<ChannelId, RuntimeEnv>;
 
   const channelMethods = listChannelPlugins().flatMap((plugin) => plugin.gatewayMethods ?? []);
   const gatewayMethods = Array.from(new Set([...baseGatewayMethods, ...channelMethods]));
