@@ -35,6 +35,7 @@ Minimal config:
   channels: {
     webex: {
       enabled: true,
+      mode: "webhook",  // or "polling" or "both"
       botToken: "YOUR_BOT_ACCESS_TOKEN"
     }
   }
@@ -46,6 +47,21 @@ Or set environment variable:
 export WEBEX_BOT_TOKEN="YOUR_BOT_ACCESS_TOKEN"
 moltbot gateway
 ```
+
+### Receiving Messages: Webhook vs Polling
+
+Moltbot supports **three modes** for receiving messages from Webex:
+
+| Mode | Description | Use Case | Requires Public URL |
+|------|-------------|----------|---------------------|
+| `webhook` | Webex pushes messages to your server | Best performance, real-time | ✅ Yes |
+| `polling` | Moltbot polls Webex API for new messages | Corporate firewalls, internal networks | ❌ No |
+| `both` | Run webhook + polling simultaneously | Maximum reliability | ✅ Yes (for webhook) |
+
+**Recommendation**:
+- 📍 **Internal/corporate network** (e.g., Cisco employees): Use `"mode": "polling"`
+- 🌐 **Public server with domain**: Use `"mode": "webhook"`
+- 💪 **Maximum uptime**: Use `"mode": "both"`
 
 ## Creating a Webex Bot
 
@@ -85,7 +101,9 @@ After creating the bot, you'll see:
   - `disabled`: No space messages processed
 - `channels.webex.groupAllowFrom` controls senders in spaces
 
-## Webhook setup
+## Webhook setup (webhook mode only)
+
+**Only required if using `"mode": "webhook"` or `"mode": "both"`**
 
 Webex requires a public HTTPS endpoint to receive messages. Configure:
 
@@ -94,6 +112,7 @@ Webex requires a public HTTPS endpoint to receive messages. Configure:
   channels: {
     webex: {
       enabled: true,
+      mode: "webhook",  // webhook requires public URL
       botToken: "YOUR_TOKEN",
       webhook: {
         port: 3979,
@@ -120,6 +139,33 @@ Webex requires a public HTTPS endpoint to receive messages. Configure:
 3. **Cloudflare Tunnel**: Use cloudflared for production tunneling
 4. **VPS**: Deploy on a VPS (AWS, DigitalOcean, etc.)
 
+## Polling setup (polling mode only)
+
+**Only required if using `"mode": "polling"` or `"mode": "both"`**
+
+Polling mode fetches messages from Webex API at regular intervals. No public URL required!
+
+```json5
+{
+  channels: {
+    webex: {
+      enabled: true,
+      mode: "polling",  // no public URL needed
+      botToken: "YOUR_TOKEN",
+      polling: {
+        intervalSeconds: 5  // check every 5 seconds (default)
+      }
+    }
+  }
+}
+```
+
+### Polling Considerations
+- **Latency**: ~5 second delay (configurable)
+- **Rate Limits**: Webex API has rate limits (120 req/min)
+- **Best For**: Corporate networks, firewalls, testing
+- **Recommended Interval**: 5-10 seconds
+
 ## Full configuration example
 
 ```json5
@@ -127,6 +173,7 @@ Webex requires a public HTTPS endpoint to receive messages. Configure:
   channels: {
     webex: {
       enabled: true,
+      mode: "polling",  // or "webhook" or "both"
       botToken: "YOUR_BOT_ACCESS_TOKEN",
       
       // DM access control
@@ -142,11 +189,16 @@ Webex requires a public HTTPS endpoint to receive messages. Configure:
         "admin@example.com"
       ],
       
-      // Webhook configuration
+      // Webhook configuration (only if mode includes "webhook")
       webhook: {
         port: 3979,
         path: "/webex/webhook",
         url: "https://your-domain.com/webex/webhook"
+      },
+      
+      // Polling configuration (only if mode includes "polling")
+      polling: {
+        intervalSeconds: 5
       }
     }
   }
@@ -155,11 +207,18 @@ Webex requires a public HTTPS endpoint to receive messages. Configure:
 
 ## How it works
 
-### Message Flow
+### Message Flow (Webhook Mode)
 1. User sends a message in Webex (DM or space)
 2. Webex API sends webhook notification to your server
 3. Moltbot fetches full message details
 4. Message is processed by the agent
+5. Agent response is sent back to Webex
+
+### Message Flow (Polling Mode)
+1. User sends a message in Webex (DM or space)
+2. Message is stored on Webex servers
+3. Moltbot polls Webex API every N seconds
+4. New messages are fetched and processed
 5. Agent response is sent back to Webex
 
 ### Bot Mention Requirement

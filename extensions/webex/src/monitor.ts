@@ -19,6 +19,7 @@ export type MonitorWebexOpts = {
 
 export type MonitorWebexResult = {
   shutdown: () => Promise<void>;
+  mode: "webhook" | "polling" | "both";
 };
 
 /**
@@ -35,14 +36,17 @@ export async function monitorWebexProvider(
   const webexCfg = cfg.channels?.webex;
   if (!webexCfg?.enabled) {
     log.debug("webex provider disabled");
-    return { shutdown: async () => {} };
+    return { shutdown: async () => {}, mode: "webhook" };
   }
 
   const credentials = resolveWebexCredentials(cfg);
   if (!credentials) {
     log.error("webex credentials not configured");
-    return { shutdown: async () => {} };
+    return { shutdown: async () => {}, mode: "webhook" };
   }
+
+  // Determine mode: webhook, polling, or both
+  const mode = webexCfg.mode || "webhook";
 
   const runtime: RuntimeEnv = opts.runtime ?? {
     log: console.log,
@@ -56,7 +60,7 @@ export async function monitorWebexProvider(
   const probe = await probeWebex(webexCfg);
   if (!probe.ok || !probe.botInfo) {
     log.error(`webex probe failed: ${probe.error}`);
-    return { shutdown: async () => {} };
+    return { shutdown: async () => {}, mode };
   }
 
   const botInfo = probe.botInfo;
@@ -73,7 +77,12 @@ export async function monitorWebexProvider(
     },
   });
 
-  // Setup webhook server
+  // State for polling mode
+  let lastMessageTime = Date.now();
+  let pollingInterval: NodeJS.Timeout | null = null;
+  const pollingIntervalMs = (webexCfg.polling?.intervalSeconds ?? 5) * 1000;
+
+  // Setup webhook server (if mode includes webhook)
   const app = express();
   app.use(express.json());
 
@@ -83,6 +92,8 @@ export async function monitorWebexProvider(
 
   let server: any = null;
   let webhookId: string | null = null;
+  const enableWebhook = mode === "webhook" || mode === "both";
+  const enablePolling = mode === "polling" || mode === "both";
 
   // Webhook endpoint
   app.post(webhookPath, async (req: Request, res: Response) => {
@@ -153,11 +164,12 @@ export async function monitorWebexProvider(
     res.status(200).json({ status: "ok", service: "webex" });
   });
 
-  // Start server
-  try {
-    server = app.listen(webhookPort, () => {
-      log.info(`webex webhook server listening on port ${webhookPort}`);
-    });
+  // Start webhook server (if enabled)
+  if (enableWebhook) {
+    try {
+      server = app.listen(webhookPort, () => {
+        log.info(`webex webhook server listening on port ${webhookPort}`);
+      });
 
     // Register webhook with Webex
     try {
@@ -186,9 +198,99 @@ export async function monitorWebexProvider(
       log.warn(`you may need to manually configure webhook to ${webhookUrl}`);
     }
 
-  } catch (error: any) {
-    log.error(`failed to start webhook server: ${error?.message || String(error)}`);
-    return { shutdown: async () => {} };
+    } catch (error: any) {
+      log.error(`failed to start webhook server: ${error?.message || String(error)}`);
+      if (mode === "webhook") {
+        return { shutdown: async () => {}, mode };
+      }
+      log.warn("continuing with polling mode only");
+    }
+  }
+
+  // Start polling (if enabled)
+  if (enablePolling) {
+    log.info(`starting polling mode (interval: ${pollingIntervalMs / 1000}s)`);
+    
+    const pollMessages = async () => {
+      try {
+        // List recent messages
+        const messages = await webex.messages.list({
+          max: 50, // Get up to 50 recent messages
+        });
+
+        // Process messages in reverse chronological order
+        const items = messages.items || [];
+        for (const message of items.reverse()) {
+          const messageTime = new Date(message.created).getTime();
+          
+          // Skip messages we've already processed
+          if (messageTime <= lastMessageTime) {
+            continue;
+          }
+
+          // Skip bot's own messages
+          if (message.personEmail === botEmail) {
+            continue;
+          }
+
+          // Parse the message (similar to webhook handler)
+          const event = {
+            resource: "messages",
+            event: "created",
+            data: { id: message.id },
+          };
+          
+          const parsed = parseWebexWebhookEvent(event, message, botId);
+
+          // Check if we should process this message
+          const requireMentionInGroups = webexCfg.groupPolicy === "mention" || 
+            webexCfg.groupPolicy === "allowlist";
+          
+          if (!shouldProcessWebexMessage(parsed, requireMentionInGroups)) {
+            lastMessageTime = Math.max(lastMessageTime, messageTime);
+            continue;
+          }
+
+          // Clean up the text (remove bot mention if present)
+          let text = parsed.text || parsed.markdown || "";
+          if (parsed.isBotMentioned) {
+            text = stripWebexBotMention(text, botName);
+          }
+
+          // Route message to agent
+          const messageContext = {
+            channel: "webex",
+            from: parsed.personEmail || parsed.personId,
+            to: parsed.roomId || parsed.personId,
+            text,
+            messageId: parsed.messageId,
+            timestamp: parsed.created,
+            isDirectMessage: parsed.roomType === "direct",
+            files: parsed.files,
+          };
+
+          // Emit message event to runtime
+          await core.channel.events.onMessage({
+            cfg,
+            context: messageContext,
+            runtime,
+          });
+
+          // Update last message time
+          lastMessageTime = Math.max(lastMessageTime, messageTime);
+        }
+      } catch (error: any) {
+        log.error(`polling error: ${error?.message || String(error)}`);
+      }
+    };
+
+    // Initial poll
+    void pollMessages();
+
+    // Set up interval
+    pollingInterval = setInterval(() => {
+      void pollMessages();
+    }, pollingIntervalMs);
   }
 
   // Handle abort signal
@@ -204,6 +306,12 @@ export async function monitorWebexProvider(
 
     // Remove abort listener
     abortSignal?.removeEventListener("abort", abortHandler);
+
+    // Stop polling interval
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      log.info("polling stopped");
+    }
 
     // Delete webhook if we created it
     if (webhookId) {
@@ -226,5 +334,5 @@ export async function monitorWebexProvider(
     }
   };
 
-  return { shutdown };
+  return { shutdown, mode };
 }
