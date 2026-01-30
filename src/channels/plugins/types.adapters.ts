@@ -3,6 +3,7 @@ import type { ReplyPayload } from "../../auto-reply/types.js";
 import type { GroupToolPolicyConfig } from "../../config/types.tools.js";
 import type { OutboundDeliveryResult, OutboundSendDeps } from "../../infra/outbound/deliver.js";
 import type { RuntimeEnv } from "../../runtime.js";
+import type { PluginRuntime } from "../../plugins/runtime/types.js";
 import type {
   ChannelAccountSnapshot,
   ChannelAccountState,
@@ -150,7 +151,7 @@ export type ChannelGatewayContext<ResolvedAccount = unknown> = {
   cfg: OpenClawConfig;
   accountId: string;
   account: ResolvedAccount;
-  runtime: RuntimeEnv;
+  runtime: PluginRuntime;
   abortSignal: AbortSignal;
   log?: ChannelLogSink;
   getStatus: () => ChannelAccountSnapshot;

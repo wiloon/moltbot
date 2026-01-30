@@ -50,6 +50,9 @@ export async function monitorWebexProvider(
 
   // Use runtime from opts (contains channel.events.onMessage)
   const runtime: PluginRuntime = opts.runtime!;
+  
+  // Debug: check if runtime has channel.events.onMessage
+  log.debug(`runtime type check: has channel? ${!!runtime.channel}, has events? ${!!runtime.channel?.events}, has onMessage? ${!!runtime.channel?.events?.onMessage}`);
 
   // Probe to get bot info
   const probe = await probeWebex(webexCfg);

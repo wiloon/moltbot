@@ -31,6 +31,8 @@ import { setGatewaySigusr1RestartPolicy } from "../infra/restart.js";
 import { startDiagnosticHeartbeat, stopDiagnosticHeartbeat } from "../logging/diagnostic.js";
 import { createSubsystemLogger, runtimeForLogger } from "../logging/subsystem.js";
 import type { PluginServicesHandle } from "../plugins/services.js";
+import { createPluginRuntime } from "../plugins/runtime/index.js";
+import type { PluginRuntime } from "../plugins/runtime/types.js";
 import type { RuntimeEnv } from "../runtime.js";
 import { runOnboardingWizard } from "../wizard/onboarding.js";
 import { startGatewayConfigReloader } from "./config-reload.js";
@@ -229,9 +231,13 @@ export async function startGatewayServer(
   const channelLogs = Object.fromEntries(
     listChannelPlugins().map((plugin) => [plugin.id, logChannels.child(plugin.id)]),
   ) as Record<ChannelId, ReturnType<typeof createSubsystemLogger>>;
+
+  // Create plugin runtime instance (shared across all channels)
+  const pluginRuntime = createPluginRuntime();
   const channelRuntimeEnvs = Object.fromEntries(
-    Object.entries(channelLogs).map(([id, logger]) => [id, runtimeForLogger(logger)]),
-  ) as Record<ChannelId, RuntimeEnv>;
+    listChannelPlugins().map((plugin) => [plugin.id, pluginRuntime]),
+  ) as Record<ChannelId, PluginRuntime>;
+
   const channelMethods = listChannelPlugins().flatMap((plugin) => plugin.gatewayMethods ?? []);
   const gatewayMethods = Array.from(new Set([...baseGatewayMethods, ...channelMethods]));
   let pluginServices: PluginServicesHandle | null = null;

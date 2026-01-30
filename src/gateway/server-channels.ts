@@ -6,7 +6,7 @@ import { formatErrorMessage } from "../infra/errors.js";
 import { resetDirectoryCache } from "../infra/outbound/target-resolver.js";
 import type { createSubsystemLogger } from "../logging/subsystem.js";
 import { DEFAULT_ACCOUNT_ID } from "../routing/session-key.js";
-import type { RuntimeEnv } from "../runtime.js";
+import type { PluginRuntime } from "../plugins/runtime/types.js";
 
 export type ChannelRuntimeSnapshot = {
   channels: Partial<Record<ChannelId, ChannelAccountSnapshot>>;
@@ -47,7 +47,7 @@ function cloneDefaultRuntime(channelId: ChannelId, accountId: string): ChannelAc
 type ChannelManagerOptions = {
   loadConfig: () => OpenClawConfig;
   channelLogs: Record<ChannelId, SubsystemLogger>;
-  channelRuntimeEnvs: Record<ChannelId, RuntimeEnv>;
+  channelRuntimeEnvs: Record<ChannelId, PluginRuntime>;
 };
 
 export type ChannelManager = {
