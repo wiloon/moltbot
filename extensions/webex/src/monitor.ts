@@ -48,13 +48,8 @@ export async function monitorWebexProvider(
   // Determine mode: webhook, polling, or both
   const mode = webexCfg.mode || "webhook";
 
-  const runtime: RuntimeEnv = opts.runtime ?? {
-    log: console.log,
-    error: console.error,
-    exit: (code: number): never => {
-      throw new Error(`exit ${code}`);
-    },
-  };
+  // Use runtime from opts (contains channel.events.onMessage)
+  const runtime: RuntimeEnv = opts.runtime!;
 
   // Probe to get bot info
   const probe = await probeWebex(webexCfg);
