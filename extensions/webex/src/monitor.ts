@@ -1,4 +1,5 @@
 import type { MoltbotConfig, PluginRuntime } from "clawdbot/plugin-sdk";
+import { DEFAULT_ACCOUNT_ID } from "clawdbot/plugin-sdk";
 import express, { type Request, type Response } from "express";
 import { WebexClient } from "./api.js";
 import { resolveWebexCredentials } from "./token.js";
@@ -48,11 +49,8 @@ export async function monitorWebexProvider(
   // Determine mode: webhook, polling, or both
   const mode = webexCfg.mode || "webhook";
 
-  // Use runtime from opts (contains channel.events.onMessage)
+  // Use runtime from opts
   const runtime: PluginRuntime = opts.runtime!;
-  
-  // Debug: check if runtime has channel.events.onMessage
-  log.debug(`runtime type check: has channel? ${!!runtime.channel}, has events? ${!!runtime.channel?.events}, has onMessage? ${!!runtime.channel?.events?.onMessage}`);
 
   // Probe to get bot info
   const probe = await probeWebex(webexCfg);
@@ -129,28 +127,92 @@ export async function monitorWebexProvider(
         text = stripWebexBotMention(text, botName);
       }
 
-      // Route message to agent
-      const messageContext = {
+      // Route message to agent using runtime dispatch
+      const route = runtime.channel.routing.resolveAgentRoute({
+        cfg,
         channel: "webex",
-        from: parsed.personEmail || parsed.personId,
-        to: parsed.roomId || parsed.personId,
-        text,
-        messageId: parsed.messageId,
-        timestamp: parsed.created,
-        isDirectMessage: parsed.roomType === "direct",
-        files: parsed.files,
-      };
+        accountId: DEFAULT_ACCOUNT_ID,
+        peer: {
+          kind: parsed.roomType === "direct" ? "dm" : "group",
+          id: parsed.roomId,
+        },
+      });
 
-      // Emit message event to runtime
-      if (runtime?.channel?.events?.onMessage) {
-        await runtime.channel.events.onMessage({
-          cfg,
-          context: messageContext,
-          runtime,
+      const storePath = runtime.channel.session.resolveStorePath(cfg.session?.store, {
+        agentId: route.agentId,
+      });
+
+      const envelopeOptions = runtime.channel.reply.resolveEnvelopeFormatOptions(cfg);
+      const previousTimestamp = runtime.channel.session.readSessionUpdatedAt({
+        storePath,
+        sessionKey: route.sessionKey,
+      });
+
+      const fromLabel = parsed.personEmail || parsed.personId;
+      const body = runtime.channel.reply.formatAgentEnvelope({
+        channel: "Webex",
+        from: fromLabel,
+        timestamp: parsed.created,
+        previousTimestamp,
+        envelope: envelopeOptions,
+        body: text,
+      });
+
+      const ctxPayload = runtime.channel.reply.finalizeInboundContext({
+        Body: body,
+        RawBody: text,
+        CommandBody: text,
+        From: `webex:${parsed.personId}`,
+        To: `webex:${parsed.roomId}`,
+        SessionKey: route.sessionKey,
+        AccountId: route.accountId,
+        ChatType: parsed.roomType === "direct" ? "direct" : "channel",
+        ConversationLabel: fromLabel,
+        SenderName: parsed.personId,
+        SenderId: parsed.personId,
+        SenderUsername: parsed.personEmail,
+        WasMentioned: parsed.roomType !== "direct" ? parsed.wasMentioned : undefined,
+        Provider: "webex",
+        Surface: "webex",
+        MessageSid: parsed.messageId,
+        MessageSidFull: parsed.messageId,
+        OriginatingChannel: "webex",
+        OriginatingTo: `webex:${parsed.roomId}`,
+      });
+
+      // Record session metadata
+      await runtime.channel.session
+        .recordSessionMetaFromInbound({
+          storePath,
+          sessionKey: ctxPayload.SessionKey ?? route.sessionKey,
+          ctx: ctxPayload,
+        })
+        .catch((err) => {
+          log.warn(`failed to record session metadata: ${String(err)}`);
         });
-      } else {
-        log.warn("runtime.channel.events.onMessage not available in webhook handler");
-      }
+
+      // Dispatch to agent
+      await runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+        ctx: ctxPayload,
+        cfg,
+        dispatcherOptions: {
+          deliver: async (payload) => {
+            const { sendMessageWebex } = await import("./send.js");
+            const result = await sendMessageWebex({
+              cfg,
+              to: parsed.roomId,
+              text: payload.text,
+              mediaUrl: payload.mediaUrl,
+            });
+            if (!result.ok) {
+              throw new Error(result.error || "failed to send message");
+            }
+          },
+          onError: (err, info) => {
+            log.error(`Webex ${info.kind} reply failed: ${String(err)}`);
+          },
+        },
+      });
 
     } catch (error: any) {
       log.error(`webhook error: ${error?.message || String(error)}`);
@@ -287,28 +349,92 @@ export async function monitorWebexProvider(
 
               log.info(`received message from ${parsed.personEmail}: ${text.substring(0, 50)}...`);
 
-              // Route message to agent
-              const messageContext = {
+              // Route message to agent using runtime dispatch
+              const route = runtime.channel.routing.resolveAgentRoute({
+                cfg,
                 channel: "webex",
-                from: parsed.personEmail || parsed.personId,
-                to: parsed.roomId || parsed.personId,
-                text,
-                messageId: parsed.messageId,
-                timestamp: parsed.created,
-                isDirectMessage: parsed.roomType === "direct",
-                files: parsed.files,
-              };
+                accountId: DEFAULT_ACCOUNT_ID,
+                peer: {
+                  kind: parsed.roomType === "direct" ? "dm" : "group",
+                  id: parsed.roomId,
+                },
+              });
 
-              // Emit message event to runtime
-              if (runtime?.channel?.events?.onMessage) {
-                await runtime.channel.events.onMessage({
-                  cfg,
-                  context: messageContext,
-                  runtime,
+              const storePath = runtime.channel.session.resolveStorePath(cfg.session?.store, {
+                agentId: route.agentId,
+              });
+
+              const envelopeOptions = runtime.channel.reply.resolveEnvelopeFormatOptions(cfg);
+              const previousTimestamp = runtime.channel.session.readSessionUpdatedAt({
+                storePath,
+                sessionKey: route.sessionKey,
+              });
+
+              const fromLabel = parsed.personEmail || parsed.personId;
+              const body = runtime.channel.reply.formatAgentEnvelope({
+                channel: "Webex",
+                from: fromLabel,
+                timestamp: parsed.created,
+                previousTimestamp,
+                envelope: envelopeOptions,
+                body: text,
+              });
+
+              const ctxPayload = runtime.channel.reply.finalizeInboundContext({
+                Body: body,
+                RawBody: text,
+                CommandBody: text,
+                From: `webex:${parsed.personId}`,
+                To: `webex:${parsed.roomId}`,
+                SessionKey: route.sessionKey,
+                AccountId: route.accountId,
+                ChatType: parsed.roomType === "direct" ? "direct" : "channel",
+                ConversationLabel: fromLabel,
+                SenderName: parsed.personId,
+                SenderId: parsed.personId,
+                SenderUsername: parsed.personEmail,
+                WasMentioned: parsed.roomType !== "direct" ? parsed.wasMentioned : undefined,
+                Provider: "webex",
+                Surface: "webex",
+                MessageSid: parsed.messageId,
+                MessageSidFull: parsed.messageId,
+                OriginatingChannel: "webex",
+                OriginatingTo: `webex:${parsed.roomId}`,
+              });
+
+              // Record session metadata
+              await runtime.channel.session
+                .recordSessionMetaFromInbound({
+                  storePath,
+                  sessionKey: ctxPayload.SessionKey ?? route.sessionKey,
+                  ctx: ctxPayload,
+                })
+                .catch((err) => {
+                  log.warn(`failed to record session metadata: ${String(err)}`);
                 });
-              } else {
-                log.warn("runtime.channel.events.onMessage not available");
-              }
+
+              // Dispatch to agent
+              await runtime.channel.reply.dispatchReplyWithBufferedBlockDispatcher({
+                ctx: ctxPayload,
+                cfg,
+                dispatcherOptions: {
+                  deliver: async (payload) => {
+                    const { sendMessageWebex } = await import("./send.js");
+                    const result = await sendMessageWebex({
+                      cfg,
+                      to: parsed.roomId,
+                      text: payload.text,
+                      mediaUrl: payload.mediaUrl,
+                    });
+                    if (!result.ok) {
+                      throw new Error(result.error || "failed to send message");
+                    }
+                  },
+                  onError: (err, info) => {
+                    log.error(`Webex ${info.kind} reply failed: ${String(err)}`);
+                  },
+                },
+              });
 
               // Update last message time for this room
               lastMessageTimeByRoom.set(room.id, Math.max(lastTime, messageTime));
