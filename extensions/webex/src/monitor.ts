@@ -31,7 +31,7 @@ export async function monitorWebexProvider(
 ): Promise<MonitorWebexResult> {
   const core = getWebexRuntime();
   const log = core.logging.getChildLogger({ name: "webex" });
-  const { cfg, abortSignal } = opts;
+  const { cfg, runtime, abortSignal } = opts;
 
   const webexCfg = cfg.channels?.webex;
   if (!webexCfg?.enabled) {
@@ -144,11 +144,15 @@ export async function monitorWebexProvider(
       };
 
       // Emit message event to runtime
-      await core.channel.events.onMessage({
-        cfg,
-        context: messageContext,
-        runtime,
-      });
+      if (runtime?.channel?.events?.onMessage) {
+        await runtime.channel.events.onMessage({
+          cfg,
+          context: messageContext,
+          runtime,
+        });
+      } else {
+        log.warn("runtime.channel.events.onMessage not available in webhook handler");
+      }
 
     } catch (error: any) {
       log.error(`webhook error: ${error?.message || String(error)}`);
@@ -298,11 +302,15 @@ export async function monitorWebexProvider(
               };
 
               // Emit message event to runtime
-              await core.channel.events.onMessage({
-                cfg,
-                context: messageContext,
-                runtime,
-              });
+              if (runtime?.channel?.events?.onMessage) {
+                await runtime.channel.events.onMessage({
+                  cfg,
+                  context: messageContext,
+                  runtime,
+                });
+              } else {
+                log.warn("runtime.channel.events.onMessage not available");
+              }
 
               // Update last message time for this room
               lastMessageTimeByRoom.set(room.id, Math.max(lastTime, messageTime));
