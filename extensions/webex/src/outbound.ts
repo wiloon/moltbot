@@ -1,4 +1,4 @@
-import type { ChannelOutboundAdapter } from "clawdbot/plugin-sdk";
+import type { ChannelOutboundAdapter } from "openclaw/plugin-sdk";
 import { getWebexRuntime } from "./runtime.js";
 import { sendMessageWebex } from "./send.js";
 

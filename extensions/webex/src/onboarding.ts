@@ -1,18 +1,18 @@
 import type {
   ChannelOnboardingAdapter,
-  MoltbotConfig,
+  OpenClawConfig,
   DmPolicy,
   WizardPrompter,
-} from "clawdbot/plugin-sdk";
+} from "openclaw/plugin-sdk";
 import {
   DEFAULT_ACCOUNT_ID,
   formatDocsLink,
-} from "clawdbot/plugin-sdk";
+} from "openclaw/plugin-sdk";
 import { resolveWebexCredentials } from "./token.js";
 
 const channel = "webex" as const;
 
-function setWebexDmPolicy(cfg: MoltbotConfig, dmPolicy: DmPolicy): MoltbotConfig {
+function setWebexDmPolicy(cfg: OpenClawConfig, dmPolicy: DmPolicy): OpenClawConfig {
   return {
     ...cfg,
     channels: {
@@ -25,7 +25,7 @@ function setWebexDmPolicy(cfg: MoltbotConfig, dmPolicy: DmPolicy): MoltbotConfig
   };
 }
 
-function setWebexBotToken(cfg: MoltbotConfig, botToken: string): MoltbotConfig {
+function setWebexBotToken(cfg: OpenClawConfig, botToken: string): OpenClawConfig {
   return {
     ...cfg,
     channels: {
@@ -53,9 +53,9 @@ async function noteWebexCredentialHelp(prompter: WizardPrompter): Promise<void> 
 }
 
 async function promptWebexBotToken(params: {
-  cfg: MoltbotConfig;
+  cfg: OpenClawConfig;
   prompter: WizardPrompter;
-}): Promise<MoltbotConfig> {
+}): Promise<OpenClawConfig> {
   await noteWebexCredentialHelp(params.prompter);
 
   const token = await params.prompter.text({

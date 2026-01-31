@@ -1,4 +1,4 @@
-import type { MoltbotConfig } from "clawdbot/plugin-sdk";
+import type { OpenClawConfig } from "openclaw/plugin-sdk";
 import { WebexClient } from "./api.js";
 import { resolveWebexCredentials } from "./token.js";
 
@@ -62,7 +62,7 @@ export async function probeWebex(
  * Verify webhook configuration
  */
 export async function verifyWebexWebhook(
-  cfg: MoltbotConfig,
+  cfg: OpenClawConfig,
   webhookUrl: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {

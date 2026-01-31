@@ -1,5 +1,5 @@
-import type { ChannelPlugin, MoltbotConfig } from "clawdbot/plugin-sdk";
-import { DEFAULT_ACCOUNT_ID, PAIRING_APPROVED_MESSAGE } from "clawdbot/plugin-sdk";
+import type { ChannelPlugin, OpenClawConfig } from "openclaw/plugin-sdk";
+import { DEFAULT_ACCOUNT_ID, PAIRING_APPROVED_MESSAGE } from "openclaw/plugin-sdk";
 import { webexOutbound } from "./outbound.js";
 import { probeWebex } from "./probe.js";
 import { resolveWebexCredentials } from "./token.js";
@@ -96,7 +96,7 @@ export const webexPlugin: ChannelPlugin<ResolvedWebexAccount> = {
       },
     }),
     deleteAccount: ({ cfg }) => {
-      const next = { ...cfg } as MoltbotConfig;
+      const next = { ...cfg } as OpenClawConfig;
       const nextChannels = { ...cfg.channels };
       delete (nextChannels as any).webex;
       if (Object.keys(nextChannels).length > 0) {

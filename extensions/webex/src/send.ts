@@ -1,10 +1,10 @@
-import type { MoltbotConfig } from "clawdbot/plugin-sdk";
+import type { OpenClawConfig } from "openclaw/plugin-sdk";
 import { WebexClient } from "./api.js";
 import { resolveWebexCredentials } from "./token.js";
 
 export type SendWebexMessageParams = {
   /** Full config (for credentials) */
-  cfg: MoltbotConfig;
+  cfg: OpenClawConfig;
   /** Room ID or person email/ID to send to */
   to: string;
   /** Message text (supports Markdown) */
@@ -86,7 +86,7 @@ export async function sendMessageWebex(
  * Get message details by ID
  */
 export async function getWebexMessage(
-  cfg: MoltbotConfig,
+  cfg: OpenClawConfig,
   messageId: string,
 ): Promise<any> {
   const credentials = resolveWebexCredentials(cfg);
@@ -101,7 +101,7 @@ export async function getWebexMessage(
 /**
  * List rooms the bot is in
  */
-export async function listWebexRooms(cfg: MoltbotConfig): Promise<any[]> {
+export async function listWebexRooms(cfg: OpenClawConfig): Promise<any[]> {
   const credentials = resolveWebexCredentials(cfg);
   if (!credentials) {
     return [];

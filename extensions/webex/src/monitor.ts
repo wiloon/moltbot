@@ -1,5 +1,5 @@
-import type { MoltbotConfig } from "clawdbot/plugin-sdk";
-import { DEFAULT_ACCOUNT_ID } from "clawdbot/plugin-sdk";
+import type { OpenClawConfig } from "openclaw/plugin-sdk";
+import { DEFAULT_ACCOUNT_ID } from "openclaw/plugin-sdk";
 import express, { type Request, type Response } from "express";
 import { WebexClient } from "./api.js";
 import { resolveWebexCredentials } from "./token.js";
@@ -13,7 +13,7 @@ import {
 import { probeWebex } from "./probe.js";
 
 export type MonitorWebexOpts = {
-  cfg: MoltbotConfig;
+  cfg: OpenClawConfig;
   abortSignal?: AbortSignal;
 };
 

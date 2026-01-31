@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { MoltbotConfig, RuntimeEnv } from "clawdbot/plugin-sdk";
+import type { OpenClawConfig, RuntimeEnv } from "openclaw/plugin-sdk";
 import { monitorWebexProvider } from "./monitor.js";
 import { WebexClient } from "./api.js";
 import * as runtime from "./runtime.js";
@@ -30,7 +30,7 @@ vi.mock("./probe.js", () => ({
 
 describe("monitorWebexProvider - polling mode", () => {
   let mockRuntime: RuntimeEnv;
-  let mockConfig: MoltbotConfig;
+  let mockConfig: OpenClawConfig;
   let mockClient: any;
   let onMessageSpy: ReturnType<typeof vi.fn>;
 
@@ -67,7 +67,7 @@ describe("monitorWebexProvider - polling mode", () => {
           },
         },
       },
-    } as MoltbotConfig;
+    } as OpenClawConfig;
 
     // Setup mock WebexClient
     mockClient = {
